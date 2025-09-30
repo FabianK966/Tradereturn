@@ -17,12 +17,24 @@ function calculateReturn() {
     let totalReturn = 0;
     let totalMaxDd = 0;
     let worstDd = 0;
+    let totalFees = 0; // Neu: Gesamte Fees über alle Sims
+    let totalWins = 0;
+    let totalLosses = 0;
+    let totalBreakEvens = 0;
+    let totalMaxLossStreak = 0;
+    let ruinedSims = 0; // Neu: Anzahl ruinierten Sims
     let capitalHistory = [capital]; // Für die erste Sim
 
     for (let sim = 0; sim < numSims; sim++) {
         let currentCapital = capital;
         let maxCapitalPeak = capital;
         let maxDd = 0;
+        let simFees = 0; // Fees pro Sim
+        let simWins = 0;
+        let simLosses = 0;
+        let simBreakEvens = 0;
+        let currentLossStreak = 0;
+        let maxLossStreak = 0;
 
         if (sim === 0) {
             capitalHistory = [capital]; // Reset für erste Sim
@@ -35,16 +47,28 @@ function calculateReturn() {
             const tradingCapital = Math.min(currentCapital, maxCapital);
 
             const isBreakEven = Math.random() < breakEvenRate;
-            if (!isBreakEven) {
+            if (isBreakEven) {
+                simBreakEvens++;
+                currentLossStreak = 0; // Break-Even bricht keine Streak
+            } else {
                 if (Math.random() < winrate) {
                     currentCapital += tradingCapital * effectiveTp;
+                    simWins++;
+                    currentLossStreak = 0;
                 } else {
                     currentCapital -= tradingCapital * effectiveSl;
+                    simLosses++;
+                    currentLossStreak++;
+                    if (currentLossStreak > maxLossStreak) {
+                        maxLossStreak = currentLossStreak;
+                    }
                 }
-            } // Bei Break-Even: Keine Änderung durch TP/SL
+            }
 
             // Gebühr für jeden Trade abziehen
-            currentCapital -= tradingCapital * effectiveFee;
+            const feeThisTrade = tradingCapital * effectiveFee;
+            currentCapital -= feeThisTrade;
+            simFees += feeThisTrade;
 
             if (sim === 0) {
                 capitalHistory.push(currentCapital);
@@ -64,6 +88,7 @@ function calculateReturn() {
                 if (sim === 0) {
                     capitalHistory.push(0);
                 }
+                ruinedSims++; // Sim als ruiniert markieren
                 break;
             }
         }
@@ -75,11 +100,23 @@ function calculateReturn() {
         if (maxDd > worstDd) {
             worstDd = maxDd;
         }
+        totalFees += simFees;
+        totalWins += simWins;
+        totalLosses += simLosses;
+        totalBreakEvens += simBreakEvens;
+        totalMaxLossStreak += maxLossStreak;
     }
 
     const avgEndCapital = totalEndCapital / numSims;
     const avgReturn = totalReturn / numSims;
     const avgMaxDd = totalMaxDd / numSims;
+    const avgFees = totalFees / numSims;
+    const avgWins = totalWins / numSims;
+    const avgLosses = totalLosses / numSims;
+    const avgBreakEvens = totalBreakEvens / numSims;
+    const avgMaxLossStreak = totalMaxLossStreak / numSims;
+    const ruinProbability = (ruinedSims / numSims) * 100;
+    const winLossRatio = avgWins / (avgLosses || 1); // Vermeide Division durch 0
     const evPerTrade = maxCapital * ((1 - breakEvenRate) * (winrate * (avgTp * leverage) - (1 - winrate) * (avgSl * leverage)) - feePerTrade * leverage);
 
     // Ergebnis anzeigen
@@ -90,6 +127,13 @@ function calculateReturn() {
         <p><strong>Durchschnittlicher max. Drawdown:</strong> ${avgMaxDd.toFixed(2)} %</p>
         <p><strong>Schlimmster Drawdown in Sims:</strong> ${worstDd.toFixed(2)} %</p>
         <p><strong>Erwarteter Wert pro Trade (bei max ${maxCapital.toFixed(2)} €):</strong> ${evPerTrade.toFixed(2)} €</p>
+        <p><strong>Durchschnittliche Gesamtfees:</strong> ${avgFees.toFixed(2)} €</p>
+        <p><strong>Durchschnittliche Anzahl Wins:</strong> ${avgWins.toFixed(0)}</p>
+        <p><strong>Durchschnittliche Anzahl Losses:</strong> ${avgLosses.toFixed(0)}</p>
+        <p><strong>Durchschnittliche Anzahl Break-Evens:</strong> ${avgBreakEvens.toFixed(0)}</p>
+        <p><strong>Win/Loss Ratio:</strong> ${winLossRatio.toFixed(2)}</p>
+        <p><strong>Durchschnittliche längste Losing-Streak:</strong> ${avgMaxLossStreak.toFixed(0)}</p>
+        <p><strong>Ruin-Wahrscheinlichkeit:</strong> ${ruinProbability.toFixed(2)} %</p>
     `;
 
     // Vorherigen Chart zerstören, falls vorhanden
