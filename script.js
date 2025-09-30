@@ -12,6 +12,8 @@ function calculateReturn() {
     const leverage = parseFloat(document.getElementById('leverage').value);
     const numTrades = parseInt(document.getElementById('num-trades').value);
     const numSims = 100;
+    const profitTrigger = parseFloat(document.getElementById('profit-trigger').value);
+    const profitTakePercentage = parseFloat(document.getElementById('profit-take-percentage').value) / 100;
 
     let totalEndCapital = 0;
     let totalReturn = 0;
@@ -25,10 +27,12 @@ function calculateReturn() {
     let totalMaxWinStreak = 0;
     let totalMaxDdDuration = 0;
     let totalAvgRecoveryTime = 0;
+    let totalCumulativeProfit = 0; // Nur Profit-Takings
     let capitalHistory = [capital]; // Für die erste Sim
 
     for (let sim = 0; sim < numSims; sim++) {
         let currentCapital = capital;
+        let baseCapital = capital; // Startkapital als Basis für den ersten Trigger
         let maxCapitalPeak = capital;
         let maxDd = 0;
         let simFees = 0;
@@ -44,6 +48,7 @@ function calculateReturn() {
         let recoveryTrades = 0;
         let totalRecoveryTrades = 0;
         let recoveryCount = 0;
+        let simCumulativeProfit = 0; // Nur Profit-Takings
 
         if (sim === 0) {
             capitalHistory = [capital]; // Reset für erste Sim
@@ -53,11 +58,15 @@ function calculateReturn() {
             const effectiveTp = avgTp * leverage;
             const effectiveSl = avgSl * leverage;
             const tradingCapital = Math.min(currentCapital, maxCapital);
-            const effectiveFee = baseFee * leverage; // Dynamisch nur mit Leverage
+            const effectiveFee = baseFee * leverage;
+
+            // Break-Even-Stop-Loss anpassen, um Gebühren zu decken
+            const adjustedBreakEvenSl = effectiveFee; // SL = Gebühr, damit Break-Even ±0 ist
 
             const isBreakEven = Math.random() < breakEvenRate;
             if (isBreakEven) {
                 simBreakEvens++;
+                currentCapital -= tradingCapital * adjustedBreakEvenSl; // Nur Gebühr abziehen
                 currentLossStreak = 0;
                 currentWinStreak = 0;
             } else {
@@ -80,10 +89,26 @@ function calculateReturn() {
                 }
             }
 
-            // Gebühr abziehen
+            // Gebühr abziehen (bereits bei Break-Even abgezogen)
             const feeThisTrade = tradingCapital * effectiveFee;
-            currentCapital -= feeThisTrade;
+            currentCapital -= feeThisTrade * (isBreakEven ? 0 : 1); // Nur bei Win/Loss Gebühr nochmal abziehen
             simFees += feeThisTrade;
+
+            // Dynamisches Profit-Taking
+            if (currentCapital >= baseCapital * profitTrigger && currentCapital > maxCapitalPeak) {
+                const profitBase = baseCapital;
+                const profit = (currentCapital - profitBase) * profitTakePercentage;
+                currentCapital -= profit; // Entferne den Gewinn-Prozentsatz
+                simCumulativeProfit += profit; // Nur Profit-Taking zum kumulativen Profit hinzufügen
+                baseCapital = currentCapital; // Aktualisiere die Basis für den nächsten Trigger
+                maxCapitalPeak = currentCapital; // Aktualisiere Peak nach Profit-Taking
+                currentDdDuration = 0; // Reset DD-Dauer nach Profit-Taking
+                if (recoveryCount > 0) {
+                    totalRecoveryTrades += recoveryTrades;
+                    recoveryCount++;
+                    recoveryTrades = 0;
+                }
+            }
 
             if (sim === 0) {
                 capitalHistory.push(currentCapital);
@@ -116,7 +141,6 @@ function calculateReturn() {
                 if (sim === 0) {
                     capitalHistory.push(0);
                 }
-                // Drawdown und Streak nach Ruin beibehalten
                 break;
             }
         }
@@ -136,6 +160,7 @@ function calculateReturn() {
         totalMaxWinStreak += maxWinStreak;
         totalMaxDdDuration += maxDdDuration;
         totalAvgRecoveryTime += (recoveryCount > 0 ? totalRecoveryTrades / recoveryCount : 0);
+        totalCumulativeProfit += simCumulativeProfit; // Nur Profit-Takings
     }
 
     const avgEndCapital = totalEndCapital / numSims;
@@ -150,6 +175,7 @@ function calculateReturn() {
     const winLossRatio = avgWins / (avgLosses || 1);
     const avgMaxDdDuration = totalMaxDdDuration / numSims;
     const avgRecoveryTime = totalAvgRecoveryTime / numSims;
+    const avgCumulativeProfit = totalCumulativeProfit / numSims; // Durchschnittlicher kumulativer Profit nur aus Profit-Takings
     const evPerTrade = maxCapital * ((1 - breakEvenRate) * (winrate * (avgTp * leverage) - (1 - winrate) * (avgSl * leverage)) - baseFee * leverage);
 
     // Ergebnis anzeigen
@@ -169,6 +195,7 @@ function calculateReturn() {
         <p><strong>Durchschnittliche längste Winning-Streak:</strong> ${avgMaxWinStreak.toFixed(0)}</p>
         <p><strong>Durchschnittliche max. Drawdown-Dauer (Trades):</strong> ${avgMaxDdDuration.toFixed(0)}</p>
         <p><strong>Durchschnittliche Recovery-Zeit (Trades):</strong> ${avgRecoveryTime.toFixed(0)}</p>
+        <p><strong>Durchschnittlicher kumulativer Profit (nur Profit-Takings):</strong> ${avgCumulativeProfit.toFixed(2)} €</p>
     `;
 
     // Vorherigen Chart zerstören, falls vorhanden
