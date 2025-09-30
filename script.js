@@ -8,7 +8,7 @@ function calculateReturn() {
     const avgTp = parseFloat(document.getElementById('avg-tp').value) / 100;
     const avgSl = parseFloat(document.getElementById('avg-sl').value) / 100;
     const breakEvenRate = parseFloat(document.getElementById('break-even-rate').value) / 100;
-    const feePerTrade = parseFloat(document.getElementById('fee-per-trade').value) / 100;
+    const baseFee = parseFloat(document.getElementById('fee-per-trade').value) / 100;
     const leverage = parseFloat(document.getElementById('leverage').value);
     const numTrades = parseInt(document.getElementById('num-trades').value);
     const numSims = 100;
@@ -17,24 +17,33 @@ function calculateReturn() {
     let totalReturn = 0;
     let totalMaxDd = 0;
     let worstDd = 0;
-    let totalFees = 0; // Neu: Gesamte Fees über alle Sims
+    let totalFees = 0;
     let totalWins = 0;
     let totalLosses = 0;
     let totalBreakEvens = 0;
     let totalMaxLossStreak = 0;
-    let ruinedSims = 0; // Neu: Anzahl ruinierten Sims
+    let totalMaxWinStreak = 0;
+    let totalMaxDdDuration = 0;
+    let totalAvgRecoveryTime = 0;
     let capitalHistory = [capital]; // Für die erste Sim
 
     for (let sim = 0; sim < numSims; sim++) {
         let currentCapital = capital;
         let maxCapitalPeak = capital;
         let maxDd = 0;
-        let simFees = 0; // Fees pro Sim
+        let simFees = 0;
         let simWins = 0;
         let simLosses = 0;
         let simBreakEvens = 0;
         let currentLossStreak = 0;
         let maxLossStreak = 0;
+        let currentWinStreak = 0;
+        let maxWinStreak = 0;
+        let currentDdDuration = 0;
+        let maxDdDuration = 0;
+        let recoveryTrades = 0;
+        let totalRecoveryTrades = 0;
+        let recoveryCount = 0;
 
         if (sim === 0) {
             capitalHistory = [capital]; // Reset für erste Sim
@@ -43,29 +52,35 @@ function calculateReturn() {
         for (let trade = 0; trade < numTrades; trade++) {
             const effectiveTp = avgTp * leverage;
             const effectiveSl = avgSl * leverage;
-            const effectiveFee = feePerTrade * leverage;
             const tradingCapital = Math.min(currentCapital, maxCapital);
+            const effectiveFee = baseFee * leverage; // Dynamisch nur mit Leverage
 
             const isBreakEven = Math.random() < breakEvenRate;
             if (isBreakEven) {
                 simBreakEvens++;
-                currentLossStreak = 0; // Break-Even bricht keine Streak
+                currentLossStreak = 0;
+                currentWinStreak = 0;
             } else {
                 if (Math.random() < winrate) {
                     currentCapital += tradingCapital * effectiveTp;
                     simWins++;
+                    currentWinStreak++;
                     currentLossStreak = 0;
+                    if (currentWinStreak > maxWinStreak) {
+                        maxWinStreak = currentWinStreak;
+                    }
                 } else {
                     currentCapital -= tradingCapital * effectiveSl;
                     simLosses++;
                     currentLossStreak++;
+                    currentWinStreak = 0;
                     if (currentLossStreak > maxLossStreak) {
                         maxLossStreak = currentLossStreak;
                     }
                 }
             }
 
-            // Gebühr für jeden Trade abziehen
+            // Gebühr abziehen
             const feeThisTrade = tradingCapital * effectiveFee;
             currentCapital -= feeThisTrade;
             simFees += feeThisTrade;
@@ -74,11 +89,24 @@ function calculateReturn() {
                 capitalHistory.push(currentCapital);
             }
 
+            // Drawdown tracken
             if (currentCapital > maxCapitalPeak) {
                 maxCapitalPeak = currentCapital;
+                currentDdDuration = 0; // Reset DD-Dauer
+                if (recoveryCount > 0) {
+                    totalRecoveryTrades += recoveryTrades;
+                    recoveryCount++;
+                    recoveryTrades = 0;
+                }
+            } else {
+                currentDdDuration++;
+                recoveryTrades++;
+                if (currentDdDuration > maxDdDuration) {
+                    maxDdDuration = currentDdDuration;
+                }
             }
 
-            const currentDd = (maxCapitalPeak - currentCapital) / maxCapitalPeak * 100;
+            const currentDd = (maxCapitalPeak > 0 ? (maxCapitalPeak - currentCapital) / maxCapitalPeak * 100 : 100);
             if (currentDd > maxDd) {
                 maxDd = currentDd;
             }
@@ -88,7 +116,7 @@ function calculateReturn() {
                 if (sim === 0) {
                     capitalHistory.push(0);
                 }
-                ruinedSims++; // Sim als ruiniert markieren
+                // Drawdown und Streak nach Ruin beibehalten
                 break;
             }
         }
@@ -105,6 +133,9 @@ function calculateReturn() {
         totalLosses += simLosses;
         totalBreakEvens += simBreakEvens;
         totalMaxLossStreak += maxLossStreak;
+        totalMaxWinStreak += maxWinStreak;
+        totalMaxDdDuration += maxDdDuration;
+        totalAvgRecoveryTime += (recoveryCount > 0 ? totalRecoveryTrades / recoveryCount : 0);
     }
 
     const avgEndCapital = totalEndCapital / numSims;
@@ -115,9 +146,11 @@ function calculateReturn() {
     const avgLosses = totalLosses / numSims;
     const avgBreakEvens = totalBreakEvens / numSims;
     const avgMaxLossStreak = totalMaxLossStreak / numSims;
-    const ruinProbability = (ruinedSims / numSims) * 100;
-    const winLossRatio = avgWins / (avgLosses || 1); // Vermeide Division durch 0
-    const evPerTrade = maxCapital * ((1 - breakEvenRate) * (winrate * (avgTp * leverage) - (1 - winrate) * (avgSl * leverage)) - feePerTrade * leverage);
+    const avgMaxWinStreak = totalMaxWinStreak / numSims;
+    const winLossRatio = avgWins / (avgLosses || 1);
+    const avgMaxDdDuration = totalMaxDdDuration / numSims;
+    const avgRecoveryTime = totalAvgRecoveryTime / numSims;
+    const evPerTrade = maxCapital * ((1 - breakEvenRate) * (winrate * (avgTp * leverage) - (1 - winrate) * (avgSl * leverage)) - baseFee * leverage);
 
     // Ergebnis anzeigen
     const resultDiv = document.getElementById('result');
@@ -133,7 +166,9 @@ function calculateReturn() {
         <p><strong>Durchschnittliche Anzahl Break-Evens:</strong> ${avgBreakEvens.toFixed(0)}</p>
         <p><strong>Win/Loss Ratio:</strong> ${winLossRatio.toFixed(2)}</p>
         <p><strong>Durchschnittliche längste Losing-Streak:</strong> ${avgMaxLossStreak.toFixed(0)}</p>
-        <p><strong>Ruin-Wahrscheinlichkeit:</strong> ${ruinProbability.toFixed(2)} %</p>
+        <p><strong>Durchschnittliche längste Winning-Streak:</strong> ${avgMaxWinStreak.toFixed(0)}</p>
+        <p><strong>Durchschnittliche max. Drawdown-Dauer (Trades):</strong> ${avgMaxDdDuration.toFixed(0)}</p>
+        <p><strong>Durchschnittliche Recovery-Zeit (Trades):</strong> ${avgRecoveryTime.toFixed(0)}</p>
     `;
 
     // Vorherigen Chart zerstören, falls vorhanden
