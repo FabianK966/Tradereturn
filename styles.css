@@ -6,7 +6,7 @@ body {
 }
 
 .container {
-    max-width: 600px;
+    max-width: 800px; /* Erhöht für Chart */
     margin: auto;
     background: white;
     padding: 20px;
@@ -54,4 +54,8 @@ button:hover {
     background-color: #e7f3ff;
     border: 1px solid #b3d4fc;
     border-radius: 4px;
+}
+
+#capitalChart {
+    max-height: 400px;
 }

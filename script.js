@@ -7,30 +7,36 @@ function calculateReturn() {
     const avgSl = parseFloat(document.getElementById('avg-sl').value) / 100;
     const leverage = parseFloat(document.getElementById('leverage').value);
     const numTrades = parseInt(document.getElementById('num-trades').value);
-    const numSims = 100; // Anzahl Simulationen für Average
+    const numSims = 100;
 
     let totalEndCapital = 0;
     let totalReturn = 0;
     let totalMaxDd = 0;
     let worstDd = 0;
+    let capitalHistory = [capital]; // Für die erste Sim
 
     for (let sim = 0; sim < numSims; sim++) {
         let currentCapital = capital;
         let maxCapitalPeak = capital;
         let maxDd = 0;
 
+        if (sim === 0) {
+            capitalHistory = [capital]; // Reset für erste Sim
+        }
+
         for (let trade = 0; trade < numTrades; trade++) {
             const effectiveTp = avgTp * leverage;
             const effectiveSl = avgSl * leverage;
-            // Begrenze das Kapital für die Trade-Berechnung
             const tradingCapital = Math.min(currentCapital, maxCapital);
 
             if (Math.random() < winrate) {
-                // Gewinn basierend auf begrenztem Kapital
                 currentCapital += tradingCapital * effectiveTp;
             } else {
-                // Verlust basierend auf begrenztem Kapital
                 currentCapital -= tradingCapital * effectiveSl;
+            }
+
+            if (sim === 0) {
+                capitalHistory.push(currentCapital);
             }
 
             if (currentCapital > maxCapitalPeak) {
@@ -43,7 +49,10 @@ function calculateReturn() {
             }
 
             if (currentCapital <= 0) {
-                currentCapital = 0; // Verhindere Negativ, Account ruined
+                currentCapital = 0;
+                if (sim === 0) {
+                    capitalHistory.push(0);
+                }
                 break;
             }
         }
@@ -71,4 +80,33 @@ function calculateReturn() {
         <p><strong>Schlimmster Drawdown in Sims:</strong> ${worstDd.toFixed(2)} %</p>
         <p><strong>Erwarteter Wert pro Trade (bei max ${maxCapital.toFixed(2)} €):</strong> ${evPerTrade.toFixed(2)} €</p>
     `;
+
+    // Liniengraph erstellen
+    const ctx = document.getElementById('capitalChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: Array.from({ length: capitalHistory.length }, (_, i) => i),
+            datasets: [{
+                label: 'Kapitalverlauf (€)',
+                data: capitalHistory,
+                borderColor: '#4CAF50',
+                fill: false,
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    title: { display: true, text: 'Trade-Nummer' }
+                },
+                y: {
+                    title: { display: true, text: 'Kapital (€)' },
+                    beginAtZero: false
+                }
+            }
+        }
+    });
 }

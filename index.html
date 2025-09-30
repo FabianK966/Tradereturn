@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Daytrading Calculator</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -34,6 +35,7 @@
             <button type="button" onclick="calculateReturn()">Berechnen</button>
         </form>
         <div id="result"></div>
+        <canvas id="capitalChart" style="margin-top: 20px;"></canvas>
     </div>
     <script src="script.js"></script>
 </body>
