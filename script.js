@@ -7,6 +7,7 @@ function calculateReturn() {
     const winrate = parseFloat(document.getElementById('winrate').value) / 100;
     const avgTp = parseFloat(document.getElementById('avg-tp').value) / 100;
     const avgSl = parseFloat(document.getElementById('avg-sl').value) / 100;
+    const breakEvenRate = parseFloat(document.getElementById('break-even-rate').value) / 100;
     const leverage = parseFloat(document.getElementById('leverage').value);
     const numTrades = parseInt(document.getElementById('num-trades').value);
     const numSims = 100;
@@ -31,11 +32,14 @@ function calculateReturn() {
             const effectiveSl = avgSl * leverage;
             const tradingCapital = Math.min(currentCapital, maxCapital);
 
-            if (Math.random() < winrate) {
-                currentCapital += tradingCapital * effectiveTp;
-            } else {
-                currentCapital -= tradingCapital * effectiveSl;
-            }
+            const isBreakEven = Math.random() < breakEvenRate;
+            if (!isBreakEven) {
+                if (Math.random() < winrate) {
+                    currentCapital += tradingCapital * effectiveTp;
+                } else {
+                    currentCapital -= tradingCapital * effectiveSl;
+                }
+            } // Bei Break-Even: Keine Änderung am Kapital
 
             if (sim === 0) {
                 capitalHistory.push(currentCapital);
@@ -71,7 +75,7 @@ function calculateReturn() {
     const avgEndCapital = totalEndCapital / numSims;
     const avgReturn = totalReturn / numSims;
     const avgMaxDd = totalMaxDd / numSims;
-    const evPerTrade = maxCapital * (winrate * (avgTp * leverage) - (1 - winrate) * (avgSl * leverage));
+    const evPerTrade = maxCapital * ((1 - breakEvenRate) * (winrate * (avgTp * leverage) - (1 - winrate) * (avgSl * leverage)));
 
     // Ergebnis anzeigen
     const resultDiv = document.getElementById('result');
