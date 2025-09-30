@@ -97,9 +97,12 @@ function calculateReturn() {
             // Dynamisches Profit-Taking
             if (currentCapital >= baseCapital * profitTrigger && currentCapital > maxCapitalPeak) {
                 const profitBase = baseCapital;
-                const profit = (currentCapital - profitBase) * profitTakePercentage;
-                currentCapital -= profit; // Entferne den Gewinn-Prozentsatz
-                simCumulativeProfit += profit; // Nur Profit-Taking zum kumulativen Profit hinzufügen
+                const profit = Math.round((currentCapital - profitBase) * profitTakePercentage); // Rundung auf ganze Euro
+                if (profit > 0) { // Sicherstellen, dass nur positive Gewinne gezählt werden
+                    currentCapital -= profit;
+                    simCumulativeProfit += profit; // Nur Profit-Taking zum kumulativen Profit hinzufügen
+                    console.log(`Sim ${sim}, Trade ${trade}: Profit-Taking ausgelöst, Base: ${profitBase}, Current: ${currentCapital + profit}, Abgezogen: ${profit}, Kumulativ: ${simCumulativeProfit}`);
+                }
                 baseCapital = currentCapital; // Aktualisiere die Basis für den nächsten Trigger
                 maxCapitalPeak = currentCapital; // Aktualisiere Peak nach Profit-Taking
                 currentDdDuration = 0; // Reset DD-Dauer nach Profit-Taking
@@ -175,7 +178,7 @@ function calculateReturn() {
     const winLossRatio = avgWins / (avgLosses || 1);
     const avgMaxDdDuration = totalMaxDdDuration / numSims;
     const avgRecoveryTime = totalAvgRecoveryTime / numSims;
-    const avgCumulativeProfit = totalCumulativeProfit / numSims; // Durchschnittlicher kumulativer Profit nur aus Profit-Takings
+    const avgCumulativeProfit = Math.round(totalCumulativeProfit / numSims); // Rundung auf ganze Euro für Durchschnitt
     const evPerTrade = maxCapital * ((1 - breakEvenRate) * (winrate * (avgTp * leverage) - (1 - winrate) * (avgSl * leverage)) - baseFee * leverage);
 
     // Ergebnis anzeigen
@@ -195,7 +198,7 @@ function calculateReturn() {
         <p><strong>Durchschnittliche längste Winning-Streak:</strong> ${avgMaxWinStreak.toFixed(0)}</p>
         <p><strong>Durchschnittliche max. Drawdown-Dauer (Trades):</strong> ${avgMaxDdDuration.toFixed(0)}</p>
         <p><strong>Durchschnittliche Recovery-Zeit (Trades):</strong> ${avgRecoveryTime.toFixed(0)}</p>
-        <p><strong>Durchschnittlicher kumulativer Profit (nur Profit-Takings):</strong> ${avgCumulativeProfit.toFixed(2)} €</p>
+        <p><strong>Durchschnittlicher kumulativer Profit (nur Profit-Takings):</strong> ${avgCumulativeProfit.toFixed(0)} €</p>
     `;
 
     // Vorherigen Chart zerstören, falls vorhanden
