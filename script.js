@@ -11,7 +11,7 @@ function calculateReturn() {
     const baseFee = parseFloat(document.getElementById('fee-per-trade').value) / 100;
     const leverage = parseFloat(document.getElementById('leverage').value);
     const numTrades = parseInt(document.getElementById('num-trades').value);
-    const numSims = 100;
+    const numSims = 1; // Nur eine Simulation
     const profitTrigger = parseFloat(document.getElementById('profit-trigger').value);
     const profitTakePercentage = parseFloat(document.getElementById('profit-take-percentage').value) / 100;
 
@@ -33,7 +33,7 @@ function calculateReturn() {
     for (let sim = 0; sim < numSims; sim++) {
         let currentCapital = capital;
         let baseCapital = capital; // Startkapital als Basis für den ersten Trigger
-        let maxCapitalPeak = capital;
+        let maxCapitalPeak = capital; // Peak nur bei realen Zuwächsen aktualisieren
         let maxDd = 0;
         let simFees = 0;
         let simWins = 0;
@@ -71,15 +71,21 @@ function calculateReturn() {
                 currentWinStreak = 0;
             } else {
                 if (Math.random() < winrate) {
-                    currentCapital += tradingCapital * effectiveTp;
+                    const profitThisTrade = tradingCapital * effectiveTp;
+                    currentCapital += profitThisTrade;
                     simWins++;
                     currentWinStreak++;
                     currentLossStreak = 0;
                     if (currentWinStreak > maxWinStreak) {
                         maxWinStreak = currentWinStreak;
                     }
+                    // Nur bei realem Gewinn Peak aktualisieren
+                    if (currentCapital > maxCapitalPeak) {
+                        maxCapitalPeak = currentCapital;
+                    }
                 } else {
-                    currentCapital -= tradingCapital * effectiveSl;
+                    const lossThisTrade = tradingCapital * effectiveSl;
+                    currentCapital -= lossThisTrade;
                     simLosses++;
                     currentLossStreak++;
                     currentWinStreak = 0;
@@ -95,21 +101,14 @@ function calculateReturn() {
             simFees += feeThisTrade;
 
             // Dynamisches Profit-Taking
-            if (currentCapital >= baseCapital * profitTrigger && currentCapital > maxCapitalPeak) {
+            if (currentCapital >= baseCapital * profitTrigger) { // Nur Trigger-Check, ohne Peak-Bedingung
                 const profitBase = baseCapital;
                 const profit = Math.round((currentCapital - profitBase) * profitTakePercentage); // Rundung auf ganze Euro
-                if (profit > 0) { // Sicherstellen, dass nur positive Gewinne gezählt werden
+                if (profit > 0) {
                     currentCapital -= profit;
                     simCumulativeProfit += profit; // Nur Profit-Taking zum kumulativen Profit hinzufügen
-                    console.log(`Sim ${sim}, Trade ${trade}: Profit-Taking ausgelöst, Base: ${profitBase}, Current: ${currentCapital + profit}, Abgezogen: ${profit}, Kumulativ: ${simCumulativeProfit}`);
-                }
-                baseCapital = currentCapital; // Aktualisiere die Basis für den nächsten Trigger
-                maxCapitalPeak = currentCapital; // Aktualisiere Peak nach Profit-Taking
-                currentDdDuration = 0; // Reset DD-Dauer nach Profit-Taking
-                if (recoveryCount > 0) {
-                    totalRecoveryTrades += recoveryTrades;
-                    recoveryCount++;
-                    recoveryTrades = 0;
+                    console.log(`Trade ${trade}: Profit-Taking ausgelöst, Base: ${profitBase}, Current: ${currentCapital + profit}, Abgezogen: ${profit}, Kumulativ: ${simCumulativeProfit}`);
+                    baseCapital = currentCapital; // Aktualisiere Basis nach Profit-Taking
                 }
             }
 
@@ -184,21 +183,21 @@ function calculateReturn() {
     // Ergebnis anzeigen
     const resultDiv = document.getElementById('result');
     resultDiv.innerHTML = `
-        <p><strong>Durchschnittliches Endkapital (über ${numSims} Sims):</strong> ${avgEndCapital.toFixed(2)} €</p>
-        <p><strong>Durchschnittlicher Return:</strong> ${avgReturn.toFixed(2)} %</p>
-        <p><strong>Durchschnittlicher max. Drawdown:</strong> ${avgMaxDd.toFixed(2)} %</p>
-        <p><strong>Schlimmster Drawdown in Sims:</strong> ${worstDd.toFixed(2)} %</p>
+        <p><strong>Endkapital (1 Sim):</strong> ${avgEndCapital.toFixed(2)} €</p>
+        <p><strong>Return:</strong> ${avgReturn.toFixed(2)} %</p>
+        <p><strong>Max. Drawdown:</strong> ${avgMaxDd.toFixed(2)} %</p>
+        <p><strong>Schlimmster Drawdown in Sim:</strong> ${worstDd.toFixed(2)} %</p>
         <p><strong>Erwarteter Wert pro Trade (bei max ${maxCapital.toFixed(2)} €):</strong> ${evPerTrade.toFixed(2)} €</p>
-        <p><strong>Durchschnittliche Gesamtfees:</strong> ${avgFees.toFixed(2)} €</p>
-        <p><strong>Durchschnittliche Anzahl Wins:</strong> ${avgWins.toFixed(0)}</p>
-        <p><strong>Durchschnittliche Anzahl Losses:</strong> ${avgLosses.toFixed(0)}</p>
-        <p><strong>Durchschnittliche Anzahl Break-Evens:</strong> ${avgBreakEvens.toFixed(0)}</p>
+        <p><strong>Gesamtfees:</strong> ${avgFees.toFixed(2)} €</p>
+        <p><strong>Anzahl Wins:</strong> ${avgWins.toFixed(0)}</p>
+        <p><strong>Anzahl Losses:</strong> ${avgLosses.toFixed(0)}</p>
+        <p><strong>Anzahl Break-Evens:</strong> ${avgBreakEvens.toFixed(0)}</p>
         <p><strong>Win/Loss Ratio:</strong> ${winLossRatio.toFixed(2)}</p>
-        <p><strong>Durchschnittliche längste Losing-Streak:</strong> ${avgMaxLossStreak.toFixed(0)}</p>
-        <p><strong>Durchschnittliche längste Winning-Streak:</strong> ${avgMaxWinStreak.toFixed(0)}</p>
-        <p><strong>Durchschnittliche max. Drawdown-Dauer (Trades):</strong> ${avgMaxDdDuration.toFixed(0)}</p>
-        <p><strong>Durchschnittliche Recovery-Zeit (Trades):</strong> ${avgRecoveryTime.toFixed(0)}</p>
-        <p><strong>Durchschnittlicher kumulativer Profit (nur Profit-Takings):</strong> ${avgCumulativeProfit.toFixed(0)} €</p>
+        <p><strong>Längste Losing-Streak:</strong> ${avgMaxLossStreak.toFixed(0)}</p>
+        <p><strong>Längste Winning-Streak:</strong> ${avgMaxWinStreak.toFixed(0)}</p>
+        <p><strong>Max. Drawdown-Dauer (Trades):</strong> ${avgMaxDdDuration.toFixed(0)}</p>
+        <p><strong>Recovery-Zeit (Trades):</strong> ${avgRecoveryTime.toFixed(0)}</p>
+        <p><strong>Kumulativer Profit (nur Profit-Takings):</strong> ${avgCumulativeProfit.toFixed(0)} €</p>
     `;
 
     // Vorherigen Chart zerstören, falls vorhanden
