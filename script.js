@@ -1,3 +1,5 @@
+let chartInstance = null; // Globale Variable für den Chart
+
 function calculateReturn() {
     // Eingaben holen
     const capital = parseFloat(document.getElementById('start-capital').value);
@@ -81,9 +83,14 @@ function calculateReturn() {
         <p><strong>Erwarteter Wert pro Trade (bei max ${maxCapital.toFixed(2)} €):</strong> ${evPerTrade.toFixed(2)} €</p>
     `;
 
+    // Vorherigen Chart zerstören, falls vorhanden
+    if (chartInstance) {
+        chartInstance.destroy();
+    }
+
     // Liniengraph erstellen
     const ctx = document.getElementById('capitalChart').getContext('2d');
-    new Chart(ctx, {
+    chartInstance = new Chart(ctx, {
         type: 'line',
         data: {
             labels: Array.from({ length: capitalHistory.length }, (_, i) => i),
