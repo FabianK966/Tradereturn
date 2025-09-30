@@ -1,39 +1,69 @@
 function calculateReturn() {
     // Eingaben holen
-    let capital = parseFloat(document.getElementById('start-capital').value);
+    const capital = parseFloat(document.getElementById('start-capital').value);
     const winrate = parseFloat(document.getElementById('winrate').value) / 100;
-    const avgTp = parseFloat(document.getElementById('avg-tp').value) / 100; // in Dezimal
-    const avgSl = parseFloat(document.getElementById('avg-sl').value) / 100; // in Dezimal
+    const avgTp = parseFloat(document.getElementById('avg-tp').value) / 100;
+    const avgSl = parseFloat(document.getElementById('avg-sl').value) / 100;
+    const leverage = parseFloat(document.getElementById('leverage').value);
     const numTrades = parseInt(document.getElementById('num-trades').value);
-    const riskPerTrade = 0.01; // 1% Risiko pro Trade (anpassbar)
+    const numSims = 100; // Anzahl Simulationen für Average
 
-    let endCapital = capital;
-    let totalWins = 0;
-    let totalLosses = 0;
+    let totalEndCapital = 0;
+    let totalReturn = 0;
+    let totalMaxDd = 0;
+    let worstDd = 0;
 
-    // Simuliere Trades (einfache deterministische Annäherung: basierend auf Winrate)
-    const expectedWins = Math.round(numTrades * winrate);
-    const expectedLosses = numTrades - expectedWins;
+    for (let sim = 0; sim < numSims; sim++) {
+        let currentCapital = capital;
+        let maxCapital = capital;
+        let maxDd = 0;
 
-    // Für Compounding: Gewinne und Verluste sequentiell anwenden (vereinfacht)
-    for (let i = 0; i < expectedWins; i++) {
-        const profit = endCapital * riskPerTrade * (avgTp / riskPerTrade); // Risk-Reward anpassen
-        endCapital += profit;
+        for (let trade = 0; trade < numTrades; trade++) {
+            const effectiveTp = avgTp * leverage;
+            const effectiveSl = avgSl * leverage;
+
+            if (Math.random() < winrate) {
+                currentCapital += currentCapital * effectiveTp;
+            } else {
+                currentCapital -= currentCapital * effectiveSl;
+            }
+
+            if (currentCapital > maxCapital) {
+                maxCapital = currentCapital;
+            }
+
+            const currentDd = (maxCapital - currentCapital) / maxCapital * 100;
+            if (currentDd > maxDd) {
+                maxDd = currentDd;
+            }
+
+            if (currentCapital <= 0) {
+                currentCapital = 0; // Verhindere Negativ, Account ruined
+                break;
+            }
+        }
+
+        const simReturn = ((currentCapital - capital) / capital) * 100;
+        totalEndCapital += currentCapital;
+        totalReturn += simReturn;
+        totalMaxDd += maxDd;
+        if (maxDd > worstDd) {
+            worstDd = maxDd;
+        }
     }
-    for (let i = 0; i < expectedLosses; i++) {
-        const loss = endCapital * avgSl; // Verlust basierend auf SL
-        endCapital -= loss;
-    }
 
-    const totalReturn = ((endCapital - capital) / capital) * 100;
-    const evPerTrade = (winrate * avgTp * capital * riskPerTrade) - ((1 - winrate) * avgSl * capital * riskPerTrade);
+    const avgEndCapital = totalEndCapital / numSims;
+    const avgReturn = totalReturn / numSims;
+    const avgMaxDd = totalMaxDd / numSims;
+    const evPerTrade = capital * (winrate * (avgTp * leverage) - (1 - winrate) * (avgSl * leverage));
 
     // Ergebnis anzeigen
     const resultDiv = document.getElementById('result');
     resultDiv.innerHTML = `
-        <p><strong>Endkapital nach ${numTrades} Trades:</strong> ${endCapital.toFixed(2)} €</p>
-        <p><strong>Gesamter Return:</strong> ${totalReturn.toFixed(2)} %</p>
+        <p><strong>Durchschnittliches Endkapital (über ${numSims} Sims):</strong> ${avgEndCapital.toFixed(2)} €</p>
+        <p><strong>Durchschnittlicher Return:</strong> ${avgReturn.toFixed(2)} %</p>
+        <p><strong>Durchschnittlicher max. Drawdown:</strong> ${avgMaxDd.toFixed(2)} %</p>
+        <p><strong>Schlimmster Drawdown in Sims:</strong> ${worstDd.toFixed(2)} %</p>
         <p><strong>Erwarteter Wert pro Trade:</strong> ${evPerTrade.toFixed(2)} €</p>
-        <p><strong>Gewinne/Verluste:</strong> ${expectedWins} Wins / ${expectedLosses} Losses</p>
     `;
 }
